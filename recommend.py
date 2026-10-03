@@ -34,20 +34,31 @@ def get_recommendations(title, indices, tfidf_matrix, df, top_n=10):
 
     # Handle duplicate titles where index could be a Series or list
     if hasattr(idx, '__iter__') and not isinstance(idx, int):
-        idx = idx[0]
+        idx = int(idx.iloc[0] if hasattr(idx, 'iloc') else idx[0])
 
     # Calculate cosine similarity with all movie vectors
     cosine_sim = linear_kernel(tfidf_matrix[idx], tfidf_matrix).flatten()
 
-    # Get the indices of the highest similarity scores
+    # Get the indices of the highest similarity scores excluding queried movie
     sim_scores = list(enumerate(cosine_sim))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
 
-    # Exclude the queried movie itself (rank 0)
-    sim_scores = sim_scores[1:top_n + 1]
+    movie_indices = []
+    seen_titles = {str(title).lower()}
+    for i, _ in sim_scores:
+        if i == idx:
+            continue
+        t = str(df.iloc[i]['title']) if 'title' in df.columns else None
+        if t and t.lower() in seen_titles:
+            continue
+        if t:
+            seen_titles.add(t.lower())
+        movie_indices.append(i)
+        if len(movie_indices) >= top_n:
+            break
 
-    movie_indices = [i[0] for i in sim_scores]
     return df[['title']].iloc[movie_indices] if 'title' in df.columns else df.iloc[movie_indices]
+
 
 if __name__ == "__main__":
     query = sys.argv[1] if len(sys.argv) > 1 else "Toy Story"
